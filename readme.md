@@ -72,6 +72,23 @@ generated image owned by the invoking host user on typical Linux hosts. The
 image is configured for headless use; a graphical PyMOL window requires
 additional host display integration and is not configured here.
 
+### Python API example
+
+The [PyMOL example](examples/pymol/) uses the Python API to render the
+included ethanol SDF. After building the image, run this from the repository
+root:
+
+```sh
+docker run --rm --user "$(id -u):$(id -g)" \
+  -v "$PWD/examples/pymol:/work" \
+  --entrypoint python3 pymol /work/render.py
+```
+
+The output is `examples/pymol/molecule.png`. Running the example again
+overwrites that file. The script runs inside the container; PyMOL does not
+need to be installed in the host's Python environment. The `examples/`
+subdirectories correspond to the image directories in `docker-files/`.
+
 ## Contributing
 
 Open an issue or submit a pull request to propose changes. Document and
