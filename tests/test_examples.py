@@ -27,6 +27,14 @@ class ExampleScriptTests(unittest.TestCase):
             '  xtb-ok) echo "TOTAL ENERGY -5"; echo "normal termination of xtb" ;;\n'
             '  xtb-no-energy) echo "normal termination of xtb" ;;\n'
             '  xtb-no-termination) echo "TOTAL ENERGY -5" ;;\n'
+            '  crest-no-termination) echo "CREST error" ;;\n'
+            '  crest-no-output) echo "CREST terminated normally." ;;\n'
+            '  crest-ok|crest-invalid) '
+            'while [ "$#" -gt 0 ]; do '
+            'if [ "$1" = "-v" ]; then shift; work=${1%:/work}; break; fi; shift; done; '
+            'if [ "$FAKE_MODE" = crest-ok ]; then echo "    3" > "$work/crest_conformers.xyz"; '
+            'else echo "2" > "$work/crest_conformers.xyz"; fi; '
+            'echo "CREST terminated normally." ;;\n'
             "esac\n",
             encoding="utf-8",
         )
@@ -76,6 +84,16 @@ class ExampleScriptTests(unittest.TestCase):
         result = self.run_example("xtb", "xtb-ok")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("xTB test passed", result.stdout)
+
+    def test_crest_requires_termination_and_expected_output(self):
+        for mode in ("error", "crest-no-termination", "crest-no-output", "crest-invalid"):
+            with self.subTest(mode=mode):
+                result = self.run_example("crest", mode)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertTrue(result.stderr)
+        result = self.run_example("crest", "crest-ok")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("CREST test passed", result.stdout)
 
 
 if __name__ == "__main__":

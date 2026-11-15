@@ -1,6 +1,7 @@
 # Molecular container
 
-This repository contains Ubuntu 26.04-based PyMOL, ORCA, Open Babel and xTB images and a
+This repository contains Ubuntu 26.04-based PyMOL, ORCA, Open Babel, xTB and
+CREST images and a
 [software list](software-list.txt) for further molecular-computing container
 work. The other tools in that list are candidates; they are not installed in
 the PyMOL image.
@@ -101,6 +102,15 @@ docker build -t xtb ./docker-files/xtb
 ```
 
 The xTB image uses conda to install xTB 6.7.1 from conda-forge into an
+isolated environment, which is copied into the Ubuntu runtime image.
+
+To build CREST on its own:
+
+```sh
+docker build -t crest ./docker-files/crest
+```
+
+The CREST image installs CREST 3.0.2 and xTB 6.7.1 from conda-forge into an
 isolated environment, which is copied into the Ubuntu runtime image.
 
 To build only ORCA manually, provide both named contexts:
@@ -242,6 +252,28 @@ smoke test that checks normal termination and the total energy:
 
 ```sh
 ./examples/xtb/test.sh
+```
+
+### CREST example
+
+Run a reduced-settings CREST conformer search on the included
+[water geometry](examples/crest/water.xyz) from the repository root:
+
+```sh
+docker run --rm --user "$(id -u):$(id -g)" -e OMP_NUM_THREADS=1 \
+  -v "$PWD/examples/crest:/work" crest water.xyz -T 1 -mquick
+```
+
+CREST writes files including `crest_conformers.xyz` into the mounted
+directory and may overwrite existing results. Use a separate writable copy
+for repeated or concurrent runs. Water keeps this smoke example fast; the
+`-mquick` reduced search is not a substitute for a production-quality search.
+
+To run an isolated smoke test that checks termination and the resulting
+conformer ensemble:
+
+```sh
+./examples/crest/test.sh
 ```
 
 ## Contributing

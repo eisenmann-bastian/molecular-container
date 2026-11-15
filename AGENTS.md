@@ -1,7 +1,8 @@
 # Project instructions
 
 - `docker-files/pymol/Dockerfile`, `docker-files/orca/Dockerfile`,
-  `docker-files/openbabel/Dockerfile` and `docker-files/xtb/Dockerfile`
+  `docker-files/openbabel/Dockerfile`, `docker-files/xtb/Dockerfile` and
+  `docker-files/crest/Dockerfile`
   build separate Ubuntu-based images.
   Other tools in the software inventory are candidates.
 - `build.sh` builds each direct image directory using its name as the tag.
