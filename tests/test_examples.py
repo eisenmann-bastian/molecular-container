@@ -24,6 +24,9 @@ class ExampleScriptTests(unittest.TestCase):
             '  orca-serial) echo "ORCA TERMINATED NORMALLY"; exit 0 ;;\n'
             '  orca-ok) echo "Program running with 2 parallel MPI-processes"; '
             'echo "FINAL SINGLE POINT ENERGY -1"; echo "ORCA TERMINATED NORMALLY" ;;\n'
+            '  xtb-ok) echo "TOTAL ENERGY -5"; echo "normal termination of xtb" ;;\n'
+            '  xtb-no-energy) echo "normal termination of xtb" ;;\n'
+            '  xtb-no-termination) echo "TOTAL ENERGY -5" ;;\n'
             "esac\n",
             encoding="utf-8",
         )
@@ -63,6 +66,16 @@ class ExampleScriptTests(unittest.TestCase):
         result = self.run_example("pymol", "success", "unexpected")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Usage:", result.stderr)
+
+    def test_xtb_requires_energy_and_normal_termination(self):
+        for mode in ("error", "xtb-no-energy", "xtb-no-termination"):
+            with self.subTest(mode=mode):
+                result = self.run_example("xtb", mode)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertTrue(result.stderr)
+        result = self.run_example("xtb", "xtb-ok")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("xTB test passed", result.stdout)
 
 
 if __name__ == "__main__":

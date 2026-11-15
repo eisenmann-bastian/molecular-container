@@ -1,6 +1,6 @@
 # Molecular container
 
-This repository contains Ubuntu 26.04-based PyMOL, ORCA and Open Babel images and a
+This repository contains Ubuntu 26.04-based PyMOL, ORCA, Open Babel and xTB images and a
 [software list](software-list.txt) for further molecular-computing container
 work. The other tools in that list are candidates; they are not installed in
 the PyMOL image.
@@ -93,6 +93,15 @@ docker build -t openbabel ./docker-files/openbabel
 The image installs Python 3 and the unofficial `openbabel-wheel` distribution
 with pip in a virtual environment. Its command-line entrypoint is `obabel`;
 its Python API is available by overriding the entrypoint with `python3`.
+
+To build xTB on its own:
+
+```sh
+docker build -t xtb ./docker-files/xtb
+```
+
+The xTB image uses conda to install xTB 6.7.1 from conda-forge into an
+isolated environment, which is copied into the Ubuntu runtime image.
 
 To build only ORCA manually, provide both named contexts:
 
@@ -215,6 +224,24 @@ To run an isolated smoke test that checks the output through the Python API:
 
 ```sh
 ./examples/openbabel/test.sh
+```
+
+### xTB example
+
+Run a GFN2-xTB single-point calculation on the included
+[water geometry](examples/xtb/water.xyz) from the repository root:
+
+```sh
+docker run --rm --user "$(id -u):$(id -g)" -e OMP_NUM_THREADS=1 \
+  -v "$PWD/examples/xtb:/work" xtb water.xyz --gfn 2
+```
+
+xTB may write or overwrite calculation files in the mounted directory. Use a
+separate writable copy for repeated or concurrent runs. To run an isolated
+smoke test that checks normal termination and the total energy:
+
+```sh
+./examples/xtb/test.sh
 ```
 
 ## Contributing

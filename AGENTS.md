@@ -1,7 +1,8 @@
 # Project instructions
 
-- `docker-files/pymol/Dockerfile`, `docker-files/orca/Dockerfile` and
-  `docker-files/openbabel/Dockerfile` build separate Ubuntu-based images.
+- `docker-files/pymol/Dockerfile`, `docker-files/orca/Dockerfile`,
+  `docker-files/openbabel/Dockerfile` and `docker-files/xtb/Dockerfile`
+  build separate Ubuntu-based images.
   Other tools in the software inventory are candidates.
 - `build.sh` builds each direct image directory using its name as the tag.
 - For image changes, build and run the headless smoke test in [readme.md](readme.md);
