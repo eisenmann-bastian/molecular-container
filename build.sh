@@ -77,8 +77,8 @@ if [ "$count" -eq 0 ]; then
     exit 1
 fi
 
-for directory in "$images"/* "$images"/.[!.]* "$images"/..?*; do
-    [ -d "$directory" ] || continue
+build_image() {
+    directory=$1
     name=${directory##*/}
     printf 'Building image %s from %s\n' "$name" "$directory"
     if [ "$name" = orca ]; then
@@ -88,7 +88,19 @@ for directory in "$images"/* "$images"/.[!.]* "$images"/..?*; do
             --build-arg "ORCA_ARCHIVE=$orca_archive" \
             --build-arg "OPENMPI_ARCHIVE=$mpi_archive" \
             -t "$name" "$directory"
+    elif [ "$name" = censo ]; then
+        docker build --platform linux/arm64 -t "$name" "$directory"
     else
         docker build -t "$name" "$directory"
     fi
+}
+
+if [ -d "$images/orca" ]; then
+    build_image "$images/orca"
+fi
+
+for directory in "$images"/* "$images"/.[!.]* "$images"/..?*; do
+    [ -d "$directory" ] || continue
+    [ "${directory##*/}" != orca ] || continue
+    build_image "$directory"
 done

@@ -7,9 +7,8 @@ if [ "$#" -ne 0 ]; then
 fi
 
 example=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
-work=$(mktemp -d "${TMPDIR:-/tmp}/xtb-example.XXXXXXXX")
-trap 'rm -rf "$work"' EXIT
-trap 'exit 1' HUP INT TERM
+. "$example/../common.sh"
+create_example_workdir "$example" xtb
 cp "$example/water.xyz" "$work/"
 
 if ! docker run --rm --pull=never --user "$(id -u):$(id -g)" \
@@ -30,4 +29,4 @@ if ! grep -q 'TOTAL ENERGY' "$work/xtb.out"; then
     exit 1
 fi
 grep 'TOTAL ENERGY' "$work/xtb.out" | tail -1
-echo "xTB test passed."
+echo "xTB completed."

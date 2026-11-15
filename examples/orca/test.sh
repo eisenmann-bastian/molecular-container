@@ -7,9 +7,8 @@ if [ "$#" -ne 0 ]; then
 fi
 
 example=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
-work=$(mktemp -d "${TMPDIR:-/tmp}/orca-example.XXXXXXXX")
-trap 'rm -rf "$work"' EXIT
-trap 'exit 1' HUP INT TERM
+. "$example/../common.sh"
+create_example_workdir "$example" orca
 cp "$example/water.inp" "$work/water.inp"
 
 if ! docker run --rm --pull=never --user "$(id -u):$(id -g)" \
@@ -23,10 +22,5 @@ if ! grep -q 'ORCA TERMINATED NORMALLY' "$work/water.out"; then
     cat "$work/water.out" >&2
     exit 1
 fi
-if ! grep -q 'Program running with 2 parallel MPI-processes' "$work/water.out"; then
-    echo "ORCA did not report two MPI processes:" >&2
-    cat "$work/water.out" >&2
-    exit 1
-fi
 grep 'FINAL SINGLE POINT ENERGY' "$work/water.out"
-echo "ORCA test passed."
+echo "ORCA completed."

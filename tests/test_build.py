@@ -164,6 +164,23 @@ class BuildScriptTests(unittest.TestCase):
         self.assertNotEqual(self.run_script(**env).returncode, 0)
         self.assertFalse(self.log.exists())
 
+    def test_builds_orca_before_censo(self):
+        self.image("censo")
+        self.image("orca")
+        archive_dir = self.root / "archives"
+        package_dir = self.root / "packages"
+        archive_dir.mkdir()
+        package_dir.mkdir()
+        (archive_dir / "orca_6_1_1_linux_arm64_shared_openmpi418.tar.xz").touch()
+        (package_dir / "openmpi-4.1.8-linux-arm64.tar.gz").touch()
+        result = self.run_script(
+            ORCA_BINARY_DIR=str(archive_dir), OPENMPI_BINARY_DIR=str(package_dir)
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        calls = self.log.read_text().splitlines()
+        self.assertIn("-t orca ", calls[0])
+        self.assertIn("build --platform linux/arm64 -t censo ", calls[1])
+
 
 if __name__ == "__main__":
     unittest.main()

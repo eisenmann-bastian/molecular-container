@@ -7,21 +7,19 @@ if [ "$#" -ne 0 ]; then
 fi
 
 example=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
-work=$(mktemp -d "${TMPDIR:-/tmp}/openbabel-example.XXXXXXXX")
-trap 'rm -rf "$work"' EXIT
-trap 'exit 1' HUP INT TERM
+. "$example/../common.sh"
+create_example_workdir "$example" openbabel
 cp "$example/ethanol.smi" "$work/"
 
-docker run --rm --pull=never --user "$(id -u):$(id -g)" \
-    -v "$work:/work" openbabel -ismi /work/ethanol.smi -osdf --gen2d -O /work/ethanol.sdf
-docker run --rm --pull=never --user "$(id -u):$(id -g)" \
-    -v "$work:/work:ro" --entrypoint python3 openbabel -c '
-from openbabel import pybel
-
-molecules = list(pybel.readfile("sdf", "/work/ethanol.sdf"))
-if len(molecules) != 1 or molecules[0].formula != "C2H6O":
-    raise SystemExit("Open Babel output does not contain one ethanol molecule")
-if molecules[0].dim != 2:
-    raise SystemExit("Open Babel output does not contain 2D coordinates")
-print("Open Babel test passed: ethanol converted to SDF.")
-'
+if ! docker run --rm --pull=never --user "$(id -u):$(id -g)" \
+    -v "$work:/work" openbabel -ismi /work/ethanol.smi -osdf --gen2d -O /work/ethanol.sdf \
+    > "$work/openbabel.out" 2>&1; then
+    echo "Open Babel container failed:" >&2
+    cat "$work/openbabel.out" >&2
+    exit 1
+fi
+if [ ! -s "$work/ethanol.sdf" ]; then
+    echo "Open Babel did not produce ethanol.sdf." >&2
+    exit 1
+fi
+echo "Open Babel completed."

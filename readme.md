@@ -1,7 +1,7 @@
 # Molecular container
 
-This repository contains Ubuntu 26.04-based PyMOL, ORCA, Open Babel, xTB and
-CREST images and a
+This repository contains Ubuntu 26.04-based PyMOL, ORCA, Open Babel, xTB,
+CREST and CENSO images and a
 [software list](software-list.txt) for further molecular-computing container
 work. The other tools in that list are candidates; they are not installed in
 the PyMOL image.
@@ -24,7 +24,8 @@ The script examines each direct subdirectory of `docker-files/`, uses it as
 the build context, and tags the image with the directory name (for example,
 `pymol:latest`). It stops on the first failure. Every image directory must
 contain a `Dockerfile` and have a name valid as a Docker image tag; Docker
-reports invalid names. Run it from any working directory.
+reports invalid names. It builds ORCA before CENSO because CENSO uses the ORCA
+image as its base. Run it from any working directory.
 
 ### ORCA build prerequisites
 
@@ -113,6 +114,18 @@ docker build -t crest ./docker-files/crest
 The CREST image installs CREST 3.0.2 and xTB 6.7.1 from conda-forge into an
 isolated environment, which is copied into the Ubuntu runtime image.
 
+To build CENSO on its own, first build the `orca:latest` image as described
+below, then run:
+
+```sh
+docker build --platform linux/arm64 -t censo ./docker-files/censo
+```
+
+The CENSO image installs xTB 6.7.1 from conda-forge and CENSO 3.0.8 from
+PyPI in a conda environment on top of the ORCA image, which supplies ORCA and
+Open MPI. It does not include Turbomole or COSMO-RS. ORCA's licensing terms
+also apply to the CENSO image.
+
 To build only ORCA manually, provide both named contexts:
 
 ```sh
@@ -130,6 +143,21 @@ uses the default archive filename above. Previous `OPENMPI_DEB_DIR` and
 `OPENMPI_DEB` options are no longer used.
 
 ## Usage
+
+Each `examples/<image>/test.sh` is a runnable example using the local image.
+It prints its output directory before starting and keeps all results, including
+logs from failed runs. Every invocation creates a separate directory under
+`examples/<image>/results/`, so it will not overwrite earlier runs. These
+directories are ignored by Git and can be removed when no longer needed.
+Set `EXAMPLE_OUTPUT_DIR` to use a different writable directory accessible to
+Docker, for example:
+
+```sh
+EXAMPLE_OUTPUT_DIR="$HOME/molecular-results" ./examples/xtb/test.sh
+```
+
+The scripts can be run from any working directory and require Docker and the
+corresponding local image. Edit the example inputs and scripts to experiment.
 
 The default container command launches PyMOL in quiet, headless mode and exits
 when its commands are complete. To run a smoke test:
@@ -180,14 +208,11 @@ overwrites that file. The script runs inside the container; PyMOL does not
 need to be installed in the host's Python environment. The `examples/`
 subdirectories correspond to the image directories in `docker-files/`.
 
-To run a self-contained smoke test instead, use:
+To run the example in a separate output directory, use:
 
 ```sh
 ./examples/pymol/test.sh
 ```
-
-The test uses the local `pymol` image, verifies the PNG signature and dimensions,
-and removes its temporary output. It does not overwrite the example output.
 
 ### ORCA example
 
@@ -206,17 +231,13 @@ directory for separate runs. Run the ORCA driver directly, not through
 default root-safety check. Check the output for `ORCA TERMINATED NORMALLY`:
 some ORCA errors can return a successful process exit status.
 
-To run the example as a self-contained test, use:
+To run the example in a separate output directory, use:
 
 ```sh
 ./examples/orca/test.sh
 ```
 
-It uses the local `orca` image, checks normal termination and two MPI processes,
-and removes its temporary output. The test scripts can be run from any
-working directory and require Docker, the corresponding image, and a writable
-temporary directory accessible to Docker. Run the ORCA test as a non-root
-user because Open MPI refuses root by default.
+Run the ORCA example as a non-root user because Open MPI refuses root by default.
 
 ### Open Babel example
 
@@ -230,7 +251,7 @@ docker run --rm --user "$(id -u):$(id -g)" \
 ```
 
 This overwrites `examples/openbabel/ethanol.sdf` if it already exists.
-To run an isolated smoke test that checks the output through the Python API:
+To run the conversion in a separate output directory:
 
 ```sh
 ./examples/openbabel/test.sh
@@ -247,8 +268,8 @@ docker run --rm --user "$(id -u):$(id -g)" -e OMP_NUM_THREADS=1 \
 ```
 
 xTB may write or overwrite calculation files in the mounted directory. Use a
-separate writable copy for repeated or concurrent runs. To run an isolated
-smoke test that checks normal termination and the total energy:
+separate writable copy for repeated or concurrent runs. To run the example in
+a separate output directory:
 
 ```sh
 ./examples/xtb/test.sh
@@ -269,12 +290,46 @@ directory and may overwrite existing results. Use a separate writable copy
 for repeated or concurrent runs. Water keeps this smoke example fast; the
 `-mquick` reduced search is not a substitute for a production-quality search.
 
-To run an isolated smoke test that checks termination and the resulting
-conformer ensemble:
+To run the example in a separate output directory:
 
 ```sh
 ./examples/crest/test.sh
 ```
+
+### CENSO example
+
+Run the complete ORCA-supported workflow on the included two-geometry water
+ensemble:
+
+```sh
+./examples/censo/test.sh
+```
+
+The [workflow configuration](examples/censo/workflow.ini) enables
+prescreening, screening, optimization, refinement, NMR and UV/Vis. It uses
+ORCA and GFN2-xTB with water solvation. The example uses small basis sets and
+two similar water geometries for a quick demonstration, not a scientifically
+meaningful conformer study. Adjust the settings and input for real work.
+CENSO 3.0.8 supports optical rotation only with Turbomole, which is not
+included in this image, so that stage is not enabled.
+
+The separate [prescreening configuration](examples/censo/prescreening.ini)
+can still be used with CENSO's `--prescreening` flag. Prescreening uses
+xTB/ALPB for the water-solvation contribution and ORCA PBE-D3/def2-SV(P) for
+the DFT single-point energy; xTB alone is not a supported prescreening backend.
+
+To generate a starter configuration from the repository root:
+
+```sh
+docker run --rm --user "$(id -u):$(id -g)" -e HOME=/work \
+  -v "$PWD/examples/censo:/work" censo --new-config
+```
+
+This writes `censo2rc_NEW` and `censo.log` in the mounted directory and may
+overwrite existing files. The generated defaults refer to external DFT
+programs such as Turbomole that are not included. Review the configuration and
+select ORCA or provide the appropriate external programs before running a
+refinement.
 
 ## Contributing
 

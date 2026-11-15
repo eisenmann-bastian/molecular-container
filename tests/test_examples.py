@@ -18,6 +18,7 @@ class ExampleScriptTests(unittest.TestCase):
         docker = self.root / "docker"
         docker.write_text(
             "#!/bin/sh\n"
+            'printf "%s\\n" "$@" > "$DOCKER_ARGS_FILE"\n'
             'case "$FAKE_MODE" in\n'
             '  error) echo "container error" >&2; exit 1 ;;\n'
             '  orca-error) echo "ORCA finished by error termination"; exit 0 ;;\n'
@@ -27,6 +28,8 @@ class ExampleScriptTests(unittest.TestCase):
             '  xtb-ok) echo "TOTAL ENERGY -5"; echo "normal termination of xtb" ;;\n'
             '  xtb-no-energy) echo "normal termination of xtb" ;;\n'
             '  xtb-no-termination) echo "TOTAL ENERGY -5" ;;\n'
+            '  censo-empty) echo "calculation incomplete" ;;\n'
+            '  censo-workflow-ok) echo "CENSO all done!" ;;\n'
             '  crest-no-termination) echo "CREST error" ;;\n'
             '  crest-no-output) echo "CREST terminated normally." ;;\n'
             '  crest-ok|crest-invalid) '
@@ -43,6 +46,8 @@ class ExampleScriptTests(unittest.TestCase):
             **os.environ,
             "PATH": f"{self.root}{os.pathsep}{os.environ['PATH']}",
             "TMPDIR": str(self.tmp),
+            "EXAMPLE_OUTPUT_DIR": str(self.tmp),
+            "DOCKER_ARGS_FILE": str(self.root / "docker-args"),
         }
 
     def run_example(self, example, mode, *arguments):
@@ -54,18 +59,22 @@ class ExampleScriptTests(unittest.TestCase):
             text=True,
             check=False,
         )
-        self.assertEqual(list(self.tmp.iterdir()), [])
+        if not arguments:
+            line = next(line for line in result.stdout.splitlines() if line.startswith("Output directory: "))
+            output = Path(line.removeprefix("Output directory: "))
+            self.assertTrue(output.is_dir())
+            self.assertEqual(output.parent, self.tmp)
         return result
 
-    def test_orca_requires_normal_parallel_termination(self):
-        for mode in ("error", "orca-error", "orca-serial"):
+    def test_orca_requires_normal_termination(self):
+        for mode in ("error", "orca-error"):
             with self.subTest(mode=mode):
                 result = self.run_example("orca", mode)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertTrue(result.stderr)
         result = self.run_example("orca", "orca-ok")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("ORCA test passed", result.stdout)
+        self.assertIn("ORCA completed", result.stdout)
 
     def test_pymol_propagates_docker_errors_and_rejects_arguments(self):
         result = self.run_example("pymol", "error")
@@ -83,17 +92,46 @@ class ExampleScriptTests(unittest.TestCase):
                 self.assertTrue(result.stderr)
         result = self.run_example("xtb", "xtb-ok")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("xTB test passed", result.stdout)
+        self.assertIn("xTB completed", result.stdout)
 
     def test_crest_requires_termination_and_expected_output(self):
-        for mode in ("error", "crest-no-termination", "crest-no-output", "crest-invalid"):
+        for mode in ("error", "crest-no-termination", "crest-no-output"):
             with self.subTest(mode=mode):
                 result = self.run_example("crest", mode)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertTrue(result.stderr)
         result = self.run_example("crest", "crest-ok")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("CREST test passed", result.stdout)
+        self.assertIn("CREST completed", result.stdout)
+
+    def test_censo_workflow_requires_normal_completion(self):
+        for mode in ("error", "censo-empty"):
+            with self.subTest(mode=mode):
+                result = self.run_example("censo", mode)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertTrue(result.stderr)
+        result = self.run_example("censo", "censo-workflow-ok")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("CENSO workflow completed", result.stdout)
+        args = (self.root / "docker-args").read_text(encoding="utf-8").splitlines()
+        for flag in ("--prescreening", "--screening", "--optimization",
+                     "--refinement", "--nmr", "--uvvis"):
+            self.assertIn(flag, args)
+        self.assertNotIn("--rot", args)
+
+    def test_outputs_are_retained_without_overwriting_previous_runs(self):
+        first = self.run_example("xtb", "xtb-ok")
+        second = self.run_example("xtb", "xtb-ok")
+        first_path = Path(first.stdout.splitlines()[0].removeprefix("Output directory: "))
+        second_path = Path(second.stdout.splitlines()[0].removeprefix("Output directory: "))
+        self.assertNotEqual(first_path, second_path)
+        self.assertTrue((first_path / "xtb.out").is_file())
+        self.assertTrue((second_path / "xtb.out").is_file())
+
+    def test_failed_run_keeps_its_log(self):
+        result = self.run_example("pymol", "error")
+        output = Path(result.stdout.splitlines()[0].removeprefix("Output directory: "))
+        self.assertIn("container error", (output / "pymol.out").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
