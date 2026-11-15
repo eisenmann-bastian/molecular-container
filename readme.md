@@ -1,6 +1,6 @@
 # Molecular container
 
-This repository contains an Ubuntu 26.04-based PyMOL image and a
+This repository contains Ubuntu 26.04-based PyMOL and ORCA images and a
 [software list](software-list.txt) for further molecular-computing container
 work. The other tools in that list are candidates; they are not installed in
 the PyMOL image.
@@ -12,8 +12,8 @@ the PyMOL image.
 
 ## Build
 
-With Docker installed and its daemon running, build every image from the
-repository root:
+With Docker installed and its daemon running, first prepare the ORCA inputs
+described below, then build every image from the repository root:
 
 ```sh
 ./build.sh
@@ -24,6 +24,52 @@ the build context, and tags the image with the directory name (for example,
 `pymol:latest`). It stops on the first failure. Every image directory must
 contain a `Dockerfile` and have a name valid as a Docker image tag; Docker
 reports invalid names. Run it from any working directory.
+
+### ORCA build prerequisites
+
+The ORCA image uses the ARM64 ORCA 6.1 archive built for Open MPI 4.1.8.
+Obtain it separately from ORCA and place the `.tar.xz` archive in
+`../binaries/orca/arm64/`. ORCA is distributed under its own license; do not
+commit or redistribute its archive or image without checking its terms.
+
+Ubuntu 26.04 supplies Open MPI 5, not the required 4.1.8. Build the matching
+standalone binary archive using the adjacent `../openmpi-build` project on an
+ARM64 Linux machine compatible with Ubuntu 26.04:
+
+```sh
+../openmpi-build/build.sh
+```
+
+The native build creates
+`../binaries/openmpi/arm64/openmpi-4.1.8-linux-arm64.tar.gz`. Transfer the
+archive to that directory on the Docker build host if necessary. The
+`openmpi-build` project does not build Linux binaries on macOS.
+Override the input directories with `ORCA_BINARY_DIR` and
+`OPENMPI_BINARY_DIR`, respectively. For example:
+
+```sh
+ORCA_BINARY_DIR=/path/to/orca/arm64 OPENMPI_BINARY_DIR=/path/to/openmpi/arm64 ./build.sh
+```
+
+Optionally select filenames within those directories with `ORCA_ARCHIVE` and
+`OPENMPI_ARCHIVE`:
+
+```sh
+ORCA_ARCHIVE=orca_6_1_1_linux_arm64_shared_openmpi418.tar.xz \
+OPENMPI_ARCHIVE=openmpi-4.1.8-linux-arm64.tar.gz ./build.sh
+```
+
+By default, the script requires exactly one ORCA archive matching
+`orca_*_linux_arm64_shared_openmpi418.tar.xz` and uses
+`openmpi-4.1.8-linux-arm64.tar.gz`. The filename overrides select files, not
+versions or architectures: the ORCA archive must still be a compatible ARM64
+build for Open MPI 4.1.8, and the Open MPI archive must contain the ARM64
+4.1.8 binary distribution produced by `openmpi-build`. The image's MPI
+installation path and target platform remain fixed.
+
+The build requires Docker BuildKit named contexts; the external directories
+are not copied into this repository. An ARM64 Docker host is recommended;
+other hosts need ARM64 emulation enabled in Docker.
 
 To build just PyMOL manually:
 
@@ -37,6 +83,22 @@ Run the build-script tests without Docker using
 The image installs Python and open-source PyMOL from Ubuntu 26.04's
 repositories. Ubuntu 26.04 provides Python 3.14 rather than the newest Python
 release. It does not include `pymol-utilities`, ORCA, xTB, or OpenBabel.
+
+To build only ORCA manually, provide both named contexts:
+
+```sh
+docker build --platform linux/arm64 \
+  --build-context orca_binaries=../binaries/orca/arm64 \
+  --build-context mpi_binaries=../binaries/openmpi/arm64 \
+  --build-arg ORCA_ARCHIVE=orca_6_1_1_linux_arm64_shared_openmpi418.tar.xz \
+  --build-arg OPENMPI_ARCHIVE=openmpi-4.1.8-linux-arm64.tar.gz \
+  -t orca ./docker-files/orca
+```
+
+These arguments are optional for a manual build: omitting `ORCA_ARCHIVE`
+enables the same automatic archive selection, and omitting `OPENMPI_ARCHIVE`
+uses the default archive filename above. Previous `OPENMPI_DEB_DIR` and
+`OPENMPI_DEB` options are no longer used.
 
 ## Usage
 
@@ -88,6 +150,44 @@ The output is `examples/pymol/molecule.png`. Running the example again
 overwrites that file. The script runs inside the container; PyMOL does not
 need to be installed in the host's Python environment. The `examples/`
 subdirectories correspond to the image directories in `docker-files/`.
+
+To run a self-contained smoke test instead, use:
+
+```sh
+./examples/pymol/test.sh
+```
+
+The test uses the local `pymol` image, verifies the PNG signature and dimensions,
+and removes its temporary output. It does not overwrite the example output.
+
+### ORCA example
+
+The [ORCA example](examples/orca/water.inp) runs a two-process Hartree–Fock
+calculation on water. From the repository root:
+
+```sh
+docker run --rm --user "$(id -u):$(id -g)" \
+  -v "$PWD/examples/orca:/work" orca water.inp > examples/orca/water.out 2>&1
+```
+
+ORCA writes calculation files into the mounted directory; the output file and
+other generated files may be overwritten. Use a writable copy of the input
+directory for separate runs. Run the ORCA driver directly, not through
+`mpirun`; it starts MPI itself. The non-root user is required for Open MPI's
+default root-safety check. Check the output for `ORCA TERMINATED NORMALLY`:
+some ORCA errors can return a successful process exit status.
+
+To run the example as a self-contained test, use:
+
+```sh
+./examples/orca/test.sh
+```
+
+It uses the local `orca` image, checks normal termination and two MPI processes,
+and removes its temporary output. Both test scripts can be run from any
+working directory and require Docker, the corresponding image, and a writable
+temporary directory accessible to Docker. Run the ORCA test as a non-root
+user because Open MPI refuses root by default.
 
 ## Contributing
 

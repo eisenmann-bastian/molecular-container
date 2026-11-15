@@ -1,7 +1,7 @@
 # Project instructions
 
-- `docker-files/pymol/Dockerfile` builds the Ubuntu-based PyMOL image. Other tools in the
-  software inventory are candidates, not installed by that image.
+- `docker-files/pymol/Dockerfile` and `docker-files/orca/Dockerfile` build
+  separate Ubuntu-based images. Other tools in the software inventory are candidates.
 - `build.sh` builds each direct image directory using its name as the tag.
 - For image changes, build and run the headless smoke test in [readme.md](readme.md);
   report explicitly if Docker or a daemon is unavailable.
