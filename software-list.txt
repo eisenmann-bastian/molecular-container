@@ -1,3 +1,4 @@
 ORCA
 xTB
 OpenBabel
+PyMOL (docker-files/pymol/Dockerfile)
