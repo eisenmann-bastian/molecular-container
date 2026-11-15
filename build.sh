@@ -5,10 +5,6 @@ if [ "$#" -ne 0 ]; then
     echo "Usage: $0" >&2
     exit 2
 fi
-if [ "${OPENMPI_DEB_DIR+x}" ] || [ "${OPENMPI_DEB+x}" ]; then
-    echo "OPENMPI_DEB_DIR and OPENMPI_DEB are no longer supported; use OPENMPI_BINARY_DIR and OPENMPI_ARCHIVE." >&2
-    exit 1
-fi
 
 root=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
 images="$root/docker-files"

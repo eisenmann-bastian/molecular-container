@@ -1,6 +1,6 @@
 # Molecular container
 
-This repository contains Ubuntu 26.04-based PyMOL and ORCA images and a
+This repository contains Ubuntu 26.04-based PyMOL, ORCA and Open Babel images and a
 [software list](software-list.txt) for further molecular-computing container
 work. The other tools in that list are candidates; they are not installed in
 the PyMOL image.
@@ -83,6 +83,16 @@ Run the build-script tests without Docker using
 The image installs Python and open-source PyMOL from Ubuntu 26.04's
 repositories. Ubuntu 26.04 provides Python 3.14 rather than the newest Python
 release. It does not include `pymol-utilities`, ORCA, xTB, or OpenBabel.
+
+To build Open Babel on its own:
+
+```sh
+docker build -t openbabel ./docker-files/openbabel
+```
+
+The image installs Python 3 and the unofficial `openbabel-wheel` distribution
+with pip in a virtual environment. Its command-line entrypoint is `obabel`;
+its Python API is available by overriding the entrypoint with `python3`.
 
 To build only ORCA manually, provide both named contexts:
 
@@ -184,10 +194,28 @@ To run the example as a self-contained test, use:
 ```
 
 It uses the local `orca` image, checks normal termination and two MPI processes,
-and removes its temporary output. Both test scripts can be run from any
+and removes its temporary output. The test scripts can be run from any
 working directory and require Docker, the corresponding image, and a writable
 temporary directory accessible to Docker. Run the ORCA test as a non-root
 user because Open MPI refuses root by default.
+
+### Open Babel example
+
+Convert the included [ethanol SMILES](examples/openbabel/ethanol.smi) to SDF
+with 2D coordinates from the repository root:
+
+```sh
+docker run --rm --user "$(id -u):$(id -g)" \
+  -v "$PWD/examples/openbabel:/work" openbabel \
+  -ismi /work/ethanol.smi -osdf --gen2d -O /work/ethanol.sdf
+```
+
+This overwrites `examples/openbabel/ethanol.sdf` if it already exists.
+To run an isolated smoke test that checks the output through the Python API:
+
+```sh
+./examples/openbabel/test.sh
+```
 
 ## Contributing
 

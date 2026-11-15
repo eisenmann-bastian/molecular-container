@@ -1,4 +1,4 @@
 ORCA (docker-files/orca/Dockerfile)
 xTB
-OpenBabel
+OpenBabel (docker-files/openbabel/Dockerfile)
 PyMOL (docker-files/pymol/Dockerfile)
