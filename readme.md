@@ -1,7 +1,7 @@
 # Molecular container
 
 This repository contains Ubuntu 26.04-based PyMOL, ORCA, Open Babel, xTB,
-CREST, CENSO and AutoDock Vina images and a
+CREST, CENSO, AutoDock Vina and GROMACS images and a
 [software list](software-list.txt) for further molecular-computing container
 work. The other tools in that list are candidates; they are not installed in
 the PyMOL image.
@@ -135,6 +135,29 @@ docker build -t autodock-vina ./docker-files/autodock-vina
 The image installs Ubuntu's `autodock-vina` package and runs the `vina`
 command by default. It contains the command-line tools, not Vina's separately
 distributed Python bindings or receptor/ligand preparation tools.
+
+To build and smoke-test GROMACS on its own:
+
+```sh
+docker build -t gromacs ./docker-files/gromacs
+docker run --rm gromacs --version
+docker run --rm gromacs help
+```
+
+The image installs the prebuilt GROMACS 2026.3 non-MPI package from
+conda-forge. Its entrypoint is `gmx`. The tested ARM64 build uses mixed
+precision, thread-MPI and OpenMP, and reports OpenCL support; GPU execution
+requires a compatible OpenCL runtime and device and has not been tested.
+Distributed MPI is not included. To run a command on local files, mount
+their directory at `/work`, for example:
+
+```sh
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" gromacs \
+  grompp -f md.mdp -c system.gro -p topol.top -o run.tpr
+```
+
+This requires appropriately prepared inputs and writes `run.tpr` and any
+other generated files to the mounted directory.
 
 To build only ORCA manually, provide both named contexts:
 
@@ -340,6 +363,20 @@ overwrite existing files. The generated defaults refer to external DFT
 programs such as Turbomole that are not included. Review the configuration and
 select ORCA or provide the appropriate external programs before running a
 refinement.
+
+### GROMACS example
+
+Build the image as described above, then run:
+
+```sh
+./examples/gromacs/test.sh
+```
+
+This uses `gmx solvate` and the packaged `spc216.gro` coordinates to create
+a 2 × 2 × 2 nm water box. The printed output directory contains `water.gro`
+and `gromacs.out`; set `EXAMPLE_OUTPUT_DIR` to change the parent directory.
+This demonstrates system construction only, not a molecular dynamics
+simulation or a validated production setup.
 
 ### AutoDock Vina example
 

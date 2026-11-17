@@ -35,6 +35,11 @@ class ExampleScriptTests(unittest.TestCase):
             'if [ "$1" = "-v" ]; then shift; work=${1%:/work}; break; fi; shift; done; '
             'if [ "$FAKE_MODE" = vina-ok ]; then '
             'echo "MODEL 1" > "$work/docked.pdbqt"; fi ;;\n'
+            '  gromacs-ok|gromacs-no-output) '
+            'while [ "$#" -gt 0 ]; do '
+            'if [ "$1" = "-v" ]; then shift; work=${1%:/work}; break; fi; shift; done; '
+            'if [ "$FAKE_MODE" = gromacs-ok ]; then '
+            'echo "water box" > "$work/water.gro"; fi ;;\n'
             '  crest-no-termination) echo "CREST error" ;;\n'
             '  crest-no-output) echo "CREST terminated normally." ;;\n'
             '  crest-ok|crest-invalid) '
@@ -149,6 +154,27 @@ class ExampleScriptTests(unittest.TestCase):
         self.assertNotIn("--center_x", args)
         self.assertIn("--seed", args)
         self.assertIn("docked.pdbqt", args)
+
+    def test_gromacs_solvation_and_failure_handling(self):
+        for mode in ("error", "gromacs-no-output"):
+            with self.subTest(mode=mode):
+                result = self.run_example("gromacs", mode)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertTrue(result.stderr)
+                output = Path(result.stdout.splitlines()[0].removeprefix("Output directory: "))
+                self.assertTrue((output / "gromacs.out").is_file())
+        result = self.run_example("gromacs", "gromacs-ok")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("GROMACS completed", result.stdout)
+        output = Path(result.stdout.splitlines()[0].removeprefix("Output directory: "))
+        self.assertTrue((output / "water.gro").is_file())
+        args = (self.root / "docker-args").read_text(encoding="utf-8").splitlines()
+        self.assertEqual(args[args.index("gromacs"):],
+                         ["gromacs", "solvate", "-cs", "spc216.gro",
+                          "-box", "2", "2", "2", "-o", "water.gro"])
+        result = self.run_example("gromacs", "gromacs-ok", "unexpected")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Usage:", result.stderr)
 
     def test_outputs_are_retained_without_overwriting_previous_runs(self):
         first = self.run_example("xtb", "xtb-ok")
