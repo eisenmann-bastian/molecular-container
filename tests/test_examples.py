@@ -47,6 +47,13 @@ class ExampleScriptTests(unittest.TestCase):
             'mkdir "$work/output"; echo "Hello World!" > "$work/output/greeting.txt"; '
             'if [ "$FAKE_MODE" = nextflow-ok ]; then echo "HELLO WORLD!" > "$work/output/uppercase.txt"; '
             'else echo "wrong" > "$work/output/uppercase.txt"; fi; fi ;;\n'
+            '  snakemake-ok|snakemake-no-output|snakemake-invalid) '
+            'while [ "$#" -gt 0 ]; do '
+            'if [ "$1" = "-v" ]; then shift; work=${1%:/work}; break; fi; shift; done; '
+            'if [ "$FAKE_MODE" != snakemake-no-output ]; then '
+            'mkdir "$work/output"; echo "Hello World!" > "$work/output/greeting.txt"; '
+            'if [ "$FAKE_MODE" = snakemake-ok ]; then echo "HELLO WORLD!" > "$work/output/uppercase.txt"; '
+            'else echo "wrong" > "$work/output/uppercase.txt"; fi; fi ;;\n'
             '  unigbsa-ok|unigbsa-no-output|unigbsa-failed|unigbsa-invalid) '
             'while [ "$#" -gt 0 ]; do '
             'if [ "$1" = "-v" ]; then shift; work=${1%:/work}; break; fi; shift; done; '
@@ -171,6 +178,29 @@ class ExampleScriptTests(unittest.TestCase):
         self.assertNotIn("--center_x", args)
         self.assertIn("--seed", args)
         self.assertIn("docked.pdbqt", args)
+
+    def test_snakemake_greetings_and_failure_handling(self):
+        for mode in ("error", "snakemake-no-output", "snakemake-invalid"):
+            with self.subTest(mode=mode):
+                result = self.run_example("snakemake", mode)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertTrue(result.stderr)
+                output = Path(result.stdout.splitlines()[0].removeprefix("Output directory: "))
+                self.assertTrue((output / "snakemake.out").is_file())
+        result = self.run_example("snakemake", "snakemake-ok")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Snakemake completed", result.stdout)
+        output = Path(result.stdout.splitlines()[0].removeprefix("Output directory: "))
+        for name in ("Snakefile", "greeting.txt"):
+            self.assertEqual((output / name).read_bytes(),
+                             (ROOT / "examples" / "snakemake" / name).read_bytes())
+        for name in ("greeting.txt", "uppercase.txt"):
+            self.assertTrue((output / "output" / name).is_file())
+        args = (self.root / "docker-args").read_text(encoding="utf-8").splitlines()
+        self.assertEqual(args[args.index("snakemake"):], ["snakemake", "--cores", "1"])
+        result = self.run_example("snakemake", "snakemake-ok", "unexpected")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Usage:", result.stderr)
 
     def test_nextflow_greetings_and_failure_handling(self):
         for mode in ("error", "nextflow-no-output", "nextflow-invalid"):

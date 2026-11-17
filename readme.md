@@ -1,7 +1,7 @@
 # Molecular container
 
 This repository contains Ubuntu 26.04-based PyMOL, ORCA, Open Babel, xTB,
-CREST, CENSO, AutoDock Vina, GROMACS, Uni-GBSA and Nextflow images and a
+CREST, CENSO, AutoDock Vina, GROMACS, Uni-GBSA, Nextflow and Snakemake images and a
 [software list](software-list.txt) for further molecular-computing container
 work. The other tools in that list are candidates; they are not installed in
 the PyMOL image.
@@ -205,6 +205,30 @@ the image; it does not include Docker, a container daemon, or molecular
 applications. Workflows using container executors or external tools require
 additional configuration and dependencies. Nextflow plugins and remotely
 hosted workflows may require network access.
+
+To build and smoke-test Snakemake:
+
+```sh
+docker build -t snakemake ./docker-files/snakemake
+docker run --rm snakemake --version
+```
+
+The image installs the current PyPI Snakemake release into a Python virtual
+environment at build time. An existing image does not update automatically;
+use `docker build --no-cache -t snakemake ./docker-files/snakemake` to fetch
+the current release again. To run a local workflow from its directory:
+
+```sh
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" snakemake --cores 1
+```
+
+Snakemake writes outputs, its `.snakemake` state, and cache to the mounted
+directory, which must be writable by the selected user.
+For arbitrary numeric user IDs, the image sets `USER=snakemake`; override it
+with `-e USER=...` if workflow metadata should record a different name.
+The image does not include conda, Docker, or molecular applications; workflows
+requiring those tools, external executors, or additional plugins need their
+own configuration and dependencies.
 
 To build only ORCA manually, provide both named contexts:
 
@@ -410,6 +434,20 @@ overwrite existing files. The generated defaults refer to external DFT
 programs such as Turbomole that are not included. Review the configuration and
 select ORCA or provide the appropriate external programs before running a
 refinement.
+
+### Snakemake example
+
+Build the Snakemake image as described above, then run:
+
+```sh
+./examples/snakemake/test.sh
+```
+
+The workflow copies a greeting and converts it to uppercase using two
+dependent rules. The printed output directory contains the copied `Snakefile`
+and input, `snakemake.out`, Snakemake's `.snakemake` state, and
+`output/greeting.txt` and `output/uppercase.txt`. Set `EXAMPLE_OUTPUT_DIR`
+to change the parent directory.
 
 ### Nextflow example
 
