@@ -1,7 +1,7 @@
 # Molecular container
 
 This repository contains Ubuntu 26.04-based PyMOL, ORCA, Open Babel, xTB,
-CREST and CENSO images and a
+CREST, CENSO and AutoDock Vina images and a
 [software list](software-list.txt) for further molecular-computing container
 work. The other tools in that list are candidates; they are not installed in
 the PyMOL image.
@@ -125,6 +125,16 @@ The CENSO image installs xTB 6.7.1 from conda-forge and CENSO 3.0.8 from
 PyPI in a conda environment on top of the ORCA image, which supplies ORCA and
 Open MPI. It does not include Turbomole or COSMO-RS. ORCA's licensing terms
 also apply to the CENSO image.
+
+To build AutoDock Vina on its own:
+
+```sh
+docker build -t autodock-vina ./docker-files/autodock-vina
+```
+
+The image installs Ubuntu's `autodock-vina` package and runs the `vina`
+command by default. It contains the command-line tools, not Vina's separately
+distributed Python bindings or receptor/ligand preparation tools.
 
 To build only ORCA manually, provide both named contexts:
 
@@ -330,6 +340,40 @@ overwrite existing files. The generated defaults refer to external DFT
 programs such as Turbomole that are not included. Review the configuration and
 select ORCA or provide the appropriate external programs before running a
 refinement.
+
+### AutoDock Vina example
+
+Run a small docking demonstration using the local image:
+
+```sh
+./examples/autodock-vina/test.sh
+```
+
+The script docks the prepared 1IEP chain A receptor and its STI ligand using
+the ligand-derived search box in `receptor.box.txt`. It prints the output
+directory, which contains copies of the input PDBQT files and box configuration,
+`vina.out`, and the docked poses in `docked.pdbqt`. It uses one CPU, a fixed
+random seed, and low exhaustiveness to keep the run quick; the results are
+for demonstration, not scientific validation. The receptor contains only
+protein residues, and the ligand's existing protonation state is retained.
+Review preparation and search parameters for scientific use.
+
+For actual docking, prepare a receptor and ligand as PDBQT files using
+appropriate preparation software, set a search box around the binding site,
+and choose suitable search parameters. For example, from a directory
+containing prepared `receptor.pdbqt` and `ligand.pdbqt`:
+
+```sh
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" autodock-vina \
+  --receptor receptor.pdbqt --ligand ligand.pdbqt \
+  --center_x 0 --center_y 0 --center_z 0 \
+  --size_x 20 --size_y 20 --size_z 20 --out docked.pdbqt
+```
+
+Replace the box coordinates and dimensions for the receptor. The command
+writes `docked.pdbqt` in the mounted directory and may overwrite an existing
+file. See the [Vina docking guide](https://autodock-vina.readthedocs.io/en/latest/docking_basic.html)
+for preparation and docking details.
 
 ## Contributing
 

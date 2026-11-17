@@ -3,4 +3,10 @@ xTB (docker-files/xtb/Dockerfile)
 CREST (docker-files/crest/Dockerfile)
 CENSO (docker-files/censo/Dockerfile)
 OpenBabel (docker-files/openbabel/Dockerfile)
+AutoDock Vina (docker-files/autodock-vina/Dockerfile)
 PyMOL (docker-files/pymol/Dockerfile)
+
+
+
+uni-gbsa
+

@@ -30,6 +30,11 @@ class ExampleScriptTests(unittest.TestCase):
             '  xtb-no-termination) echo "TOTAL ENERGY -5" ;;\n'
             '  censo-empty) echo "calculation incomplete" ;;\n'
             '  censo-workflow-ok) echo "CENSO all done!" ;;\n'
+            '  vina-ok|vina-no-output) '
+            'while [ "$#" -gt 0 ]; do '
+            'if [ "$1" = "-v" ]; then shift; work=${1%:/work}; break; fi; shift; done; '
+            'if [ "$FAKE_MODE" = vina-ok ]; then '
+            'echo "MODEL 1" > "$work/docked.pdbqt"; fi ;;\n'
             '  crest-no-termination) echo "CREST error" ;;\n'
             '  crest-no-output) echo "CREST terminated normally." ;;\n'
             '  crest-ok|crest-invalid) '
@@ -118,6 +123,32 @@ class ExampleScriptTests(unittest.TestCase):
                      "--refinement", "--nmr", "--uvvis"):
             self.assertIn(flag, args)
         self.assertNotIn("--rot", args)
+
+    def test_vina_requires_output_and_retains_inputs(self):
+        for mode in ("error", "vina-no-output"):
+            with self.subTest(mode=mode):
+                result = self.run_example("autodock-vina", mode)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertTrue(result.stderr)
+        result = self.run_example("autodock-vina", "vina-ok")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("AutoDock Vina completed", result.stdout)
+        output = Path(result.stdout.splitlines()[0].removeprefix("Output directory: "))
+        for name in ("receptor.pdbqt", "ligand.pdbqt", "receptor.box.txt"):
+            self.assertEqual(
+                (output / name).read_bytes(),
+                (ROOT / "examples" / "autodock-vina" / name).read_bytes(),
+            )
+        for name in ("vina.out", "docked.pdbqt"):
+            self.assertTrue((output / name).is_file())
+        args = (self.root / "docker-args").read_text(encoding="utf-8").splitlines()
+        for flag, value in (("--receptor", "receptor.pdbqt"),
+                            ("--ligand", "ligand.pdbqt"),
+                            ("--config", "receptor.box.txt")):
+            self.assertEqual(args[args.index(flag) + 1], value)
+        self.assertNotIn("--center_x", args)
+        self.assertIn("--seed", args)
+        self.assertIn("docked.pdbqt", args)
 
     def test_outputs_are_retained_without_overwriting_previous_runs(self):
         first = self.run_example("xtb", "xtb-ok")
