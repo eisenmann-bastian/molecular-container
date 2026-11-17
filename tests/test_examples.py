@@ -40,6 +40,13 @@ class ExampleScriptTests(unittest.TestCase):
             'if [ "$1" = "-v" ]; then shift; work=${1%:/work}; break; fi; shift; done; '
             'if [ "$FAKE_MODE" = gromacs-ok ]; then '
             'echo "water box" > "$work/water.gro"; fi ;;\n'
+            '  nextflow-ok|nextflow-no-output|nextflow-invalid) '
+            'while [ "$#" -gt 0 ]; do '
+            'if [ "$1" = "-v" ]; then shift; work=${1%:/work}; break; fi; shift; done; '
+            'if [ "$FAKE_MODE" != nextflow-no-output ]; then '
+            'mkdir "$work/output"; echo "Hello World!" > "$work/output/greeting.txt"; '
+            'if [ "$FAKE_MODE" = nextflow-ok ]; then echo "HELLO WORLD!" > "$work/output/uppercase.txt"; '
+            'else echo "wrong" > "$work/output/uppercase.txt"; fi; fi ;;\n'
             '  unigbsa-ok|unigbsa-no-output|unigbsa-failed|unigbsa-invalid) '
             'while [ "$#" -gt 0 ]; do '
             'if [ "$1" = "-v" ]; then shift; work=${1%:/work}; break; fi; shift; done; '
@@ -164,6 +171,30 @@ class ExampleScriptTests(unittest.TestCase):
         self.assertNotIn("--center_x", args)
         self.assertIn("--seed", args)
         self.assertIn("docked.pdbqt", args)
+
+    def test_nextflow_greetings_and_failure_handling(self):
+        for mode in ("error", "nextflow-no-output", "nextflow-invalid"):
+            with self.subTest(mode=mode):
+                result = self.run_example("nextflow", mode)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertTrue(result.stderr)
+                output = Path(result.stdout.splitlines()[0].removeprefix("Output directory: "))
+                self.assertTrue((output / "nextflow.out").is_file())
+        result = self.run_example("nextflow", "nextflow-ok")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Nextflow completed", result.stdout)
+        output = Path(result.stdout.splitlines()[0].removeprefix("Output directory: "))
+        for name in ("main.nf", "greetings.csv"):
+            self.assertEqual((output / name).read_bytes(),
+                             (ROOT / "examples" / "nextflow" / name).read_bytes())
+        for name in ("greeting.txt", "uppercase.txt"):
+            self.assertTrue((output / "output" / name).is_file())
+        args = (self.root / "docker-args").read_text(encoding="utf-8").splitlines()
+        self.assertIn("NXF_OFFLINE=true", args)
+        self.assertEqual(args[args.index("nextflow"):], ["nextflow", "run", "main.nf"])
+        result = self.run_example("nextflow", "nextflow-ok", "unexpected")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Usage:", result.stderr)
 
     def test_unigbsa_requires_successful_result(self):
         for mode in ("error", "unigbsa-no-output", "unigbsa-failed", "unigbsa-invalid"):

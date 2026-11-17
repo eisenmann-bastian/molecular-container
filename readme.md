@@ -1,7 +1,7 @@
 # Molecular container
 
 This repository contains Ubuntu 26.04-based PyMOL, ORCA, Open Babel, xTB,
-CREST, CENSO, AutoDock Vina, GROMACS and Uni-GBSA images and a
+CREST, CENSO, AutoDock Vina, GROMACS, Uni-GBSA and Nextflow images and a
 [software list](software-list.txt) for further molecular-computing container
 work. The other tools in that list are candidates; they are not installed in
 the PyMOL image.
@@ -180,6 +180,31 @@ The command writes results and intermediate files into the mounted directory;
 use a dedicated working directory. The ARM64 image was tested with the
 [upstream 1CEB example](https://github.com/dptech-corp/Uni-GBSA/tree/master/example/1ceb).
 Review the input structures and calculation settings before scientific use.
+
+To build and smoke-test Nextflow:
+
+```sh
+docker build -t nextflow ./docker-files/nextflow
+docker run --rm nextflow -version
+```
+
+The image includes Java 21 and the current Nextflow release selected by the
+[official self-install method](https://docs.seqera.io/nextflow/install) at
+build time. To fetch a newer release later, rebuild with `docker build
+--no-cache -t nextflow ./docker-files/nextflow`; an existing image does not
+update automatically.
+To run a local workflow from its directory:
+
+```sh
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" nextflow run main.nf
+```
+
+The workflow, Nextflow cache, logs, and work directory are stored under the
+mounted directory. This image runs local processes using tools available inside
+the image; it does not include Docker, a container daemon, or molecular
+applications. Workflows using container executors or external tools require
+additional configuration and dependencies. Nextflow plugins and remotely
+hosted workflows may require network access.
 
 To build only ORCA manually, provide both named contexts:
 
@@ -385,6 +410,22 @@ overwrite existing files. The generated defaults refer to external DFT
 programs such as Turbomole that are not included. Review the configuration and
 select ORCA or provide the appropriate external programs before running a
 refinement.
+
+### Nextflow example
+
+Build the Nextflow image as described above, then run:
+
+```sh
+./examples/nextflow/test.sh
+```
+
+Inspired by the [Seqera hello-world workflow](https://github.com/seqeralabs/nf-hello-world),
+this example reads one greeting from a CSV file, writes it to a file, and runs
+a second process to convert it to uppercase. The script prints the output
+directory, which contains the copied workflow and CSV, `nextflow.out`, the
+Nextflow work directory, and `output/greeting.txt` and `output/uppercase.txt`.
+Set `EXAMPLE_OUTPUT_DIR` to change the parent directory. The example runs
+offline and does not require additional software inside the container.
 
 ### Uni-GBSA example
 
