@@ -3,7 +3,8 @@
 - `docker-files/pymol/Dockerfile`, `docker-files/orca/Dockerfile`,
   `docker-files/openbabel/Dockerfile`, `docker-files/xtb/Dockerfile`,
   `docker-files/crest/Dockerfile`, `docker-files/censo/Dockerfile`,
-  `docker-files/autodock-vina/Dockerfile`, and `docker-files/gromacs/Dockerfile`
+  `docker-files/autodock-vina/Dockerfile`, `docker-files/gromacs/Dockerfile`,
+  and `docker-files/unigbsa/Dockerfile`
   build separate Ubuntu-based images.
   Other tools in the software inventory are candidates.
 - `build.sh` builds each direct image directory using its name as the tag.

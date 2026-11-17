@@ -1,7 +1,7 @@
 # Molecular container
 
 This repository contains Ubuntu 26.04-based PyMOL, ORCA, Open Babel, xTB,
-CREST, CENSO, AutoDock Vina and GROMACS images and a
+CREST, CENSO, AutoDock Vina, GROMACS and Uni-GBSA images and a
 [software list](software-list.txt) for further molecular-computing container
 work. The other tools in that list are candidates; they are not installed in
 the PyMOL image.
@@ -158,6 +158,28 @@ docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" gromacs \
 
 This requires appropriately prepared inputs and writes `run.tpr` and any
 other generated files to the mounted directory.
+
+To build and smoke-test Uni-GBSA:
+
+```sh
+docker build -t unigbsa ./docker-files/unigbsa
+docker run --rm unigbsa --help
+```
+
+The image installs Uni-GBSA 0.1.7 and Lickit from PyPI, with ACPYPE,
+gmx_MMPBSA 1.7.1, AmberTools, GROMACS and other scientific dependencies from
+conda-forge. Its entrypoint is `unigbsa-pipeline`. For example, with a prepared
+protein PDB and ligand SDF in the current directory:
+
+```sh
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" unigbsa \
+  -i protein.pdb -l ligand.sdf -o BindingEnergy.csv -nt 1
+```
+
+The command writes results and intermediate files into the mounted directory;
+use a dedicated working directory. The ARM64 image was tested with the
+[upstream 1CEB example](https://github.com/dptech-corp/Uni-GBSA/tree/master/example/1ceb).
+Review the input structures and calculation settings before scientific use.
 
 To build only ORCA manually, provide both named contexts:
 
@@ -363,6 +385,29 @@ overwrite existing files. The generated defaults refer to external DFT
 programs such as Turbomole that are not included. Review the configuration and
 select ORCA or provide the appropriate external programs before running a
 refinement.
+
+### Uni-GBSA example
+
+Build the image as described above, then run:
+
+```sh
+./examples/unigbsa/test.sh
+```
+
+This calculates a GB binding-energy estimate for the 1IEP chain A receptor
+and its STI ligand, the same source structure used in the Vina example.
+Uni-GBSA requires a protein PDB and ligand SDF rather than Vina's PDBQT
+files; the included files were extracted from the downloaded 1IEP structure
+by the `molecular-docking` workflow. The ligand contains hydrogens added
+without changing its existing protonation state. This uses the crystallographic
+ligand coordinates, not a docked Vina pose.
+
+The script prints the output directory, which retains the inputs,
+`unigbsa.out`, `BindingEnergy.csv`, and intermediate files. Set
+`EXAMPLE_OUTPUT_DIR` to change its parent. The default Uni-GBSA settings
+perform energy minimization and a single-frame GB calculation; this is a
+demonstration, not a scientifically validated binding-energy estimate.
+Review protonation, preparation, force fields and sampling for real studies.
 
 ### GROMACS example
 

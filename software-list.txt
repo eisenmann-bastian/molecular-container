@@ -5,8 +5,5 @@ CENSO (docker-files/censo/Dockerfile)
 OpenBabel (docker-files/openbabel/Dockerfile)
 AutoDock Vina (docker-files/autodock-vina/Dockerfile)
 GROMACS (docker-files/gromacs/Dockerfile)
+Uni-GBSA (docker-files/unigbsa/Dockerfile)
 PyMOL (docker-files/pymol/Dockerfile)
-
-
-
-uni-gbsa

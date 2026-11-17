@@ -40,6 +40,16 @@ class ExampleScriptTests(unittest.TestCase):
             'if [ "$1" = "-v" ]; then shift; work=${1%:/work}; break; fi; shift; done; '
             'if [ "$FAKE_MODE" = gromacs-ok ]; then '
             'echo "water box" > "$work/water.gro"; fi ;;\n'
+            '  unigbsa-ok|unigbsa-no-output|unigbsa-failed|unigbsa-invalid) '
+            'while [ "$#" -gt 0 ]; do '
+            'if [ "$1" = "-v" ]; then shift; work=${1%:/work}; break; fi; shift; done; '
+            'if [ "$FAKE_MODE" != unigbsa-no-output ]; then '
+            'echo "ligandName,mode,TOTAL,status" > "$work/BindingEnergy.csv"; '
+            'case "$FAKE_MODE" in '
+            'unigbsa-ok) echo "ligand,gb,-20.3,S" ;; '
+            'unigbsa-failed) echo "ligand,gb,-20.3,F" ;; '
+            'unigbsa-invalid) echo "ligand,gb,nan,S" ;; '
+            'esac >> "$work/BindingEnergy.csv"; fi ;;\n'
             '  crest-no-termination) echo "CREST error" ;;\n'
             '  crest-no-output) echo "CREST terminated normally." ;;\n'
             '  crest-ok|crest-invalid) '
@@ -154,6 +164,29 @@ class ExampleScriptTests(unittest.TestCase):
         self.assertNotIn("--center_x", args)
         self.assertIn("--seed", args)
         self.assertIn("docked.pdbqt", args)
+
+    def test_unigbsa_requires_successful_result(self):
+        for mode in ("error", "unigbsa-no-output", "unigbsa-failed", "unigbsa-invalid"):
+            with self.subTest(mode=mode):
+                result = self.run_example("unigbsa", mode)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertTrue(result.stderr)
+                output = Path(result.stdout.splitlines()[0].removeprefix("Output directory: "))
+                self.assertTrue((output / "unigbsa.out").is_file())
+        result = self.run_example("unigbsa", "unigbsa-ok")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Uni-GBSA completed", result.stdout)
+        output = Path(result.stdout.splitlines()[0].removeprefix("Output directory: "))
+        for name in ("receptor.pdb", "ligand.sdf"):
+            self.assertEqual((output / name).read_bytes(),
+                             (ROOT / "examples" / "unigbsa" / name).read_bytes())
+        args = (self.root / "docker-args").read_text(encoding="utf-8").splitlines()
+        self.assertEqual(args[args.index("unigbsa"):],
+                         ["unigbsa", "-i", "receptor.pdb", "-l", "ligand.sdf",
+                          "-o", "BindingEnergy.csv", "-nt", "1", "--verbose"])
+        result = self.run_example("unigbsa", "unigbsa-ok", "unexpected")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Usage:", result.stderr)
 
     def test_gromacs_solvation_and_failure_handling(self):
         for mode in ("error", "gromacs-no-output"):
